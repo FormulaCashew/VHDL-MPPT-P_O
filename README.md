@@ -15,6 +15,10 @@ The system is built using the following key hardware components:
 - **4x 7-Segment Displays**: Visual output for displaying the current power extraction.
 - **Switch**: A physical switch to enable or disable the MPPT system.
 
+## Development Environment
+
+This code was developed for a **DE10-Lite Altera FPGA**. The repository includes files for opening and compiling the project in **Quartus Prime**.
+
 ## Key Features
 
 ### MPPT Algorithm

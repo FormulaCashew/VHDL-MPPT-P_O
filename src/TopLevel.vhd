@@ -1,0 +1,206 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity TopLevel is
+    port (
+        CLK : in std_logic;
+        RST : in std_logic;
+        Hi_MOSFET : out std_logic;
+        Lo_MOSFET : out std_logic;
+        PWM_deb : out std_logic_vector(1 downto 0);
+        SHTDWN : out std_logic;
+        SDA : inout std_logic;
+        SCL : inout std_logic;
+        TX : out std_logic;
+        ENA_INA : in std_logic;
+        ENA_UART : in std_logic;
+        ENA_MPPT : in std_logic;
+        DISP1 : out std_logic_vector(7 downto 0);
+        DISP2 : out std_logic_vector(7 downto 0);
+        DISP3 : out std_logic_vector(7 downto 0);
+        DISP4 : out std_logic_vector(7 downto 0);
+        DATA_SEL : in std_logic
+    );
+end TopLevel;
+
+architecture Structural of TopLevel is
+    component Get_INA219 is
+        generic(
+            SAMPLE_FREQ : integer := 70 --in hz
+        );
+        port (
+            CLK : in std_logic;
+            RST : in std_logic;
+            SDA : inout std_logic;
+            SCL : inout std_logic;
+            ENA : in std_logic; -- Start signal to initiate reading
+            DONE : out std_logic; -- Signal to indicate reading is done
+            DATA_RD : out std_logic_vector(15 downto 0) -- Data read from INA219
+        );
+    end component;
+
+    component MPPT is
+        port (
+            CLK : in std_logic; -- System clock
+            RST : in std_logic; -- General reset signal
+            STR : in std_logic; -- Sampler, given by the INA219 DONE signal
+            ENA : in std_logic;
+            DATA_INA : in std_logic_vector(15 downto 0); -- Received from GET_INA219
+            ERR : out std_logic_vector(15 downto 0); -- Send Over UART
+            DUT : out std_logic_vector(11 downto 0); -- To send over uart
+            PWR : out std_logic_vector(15 downto 0); -- Power register, to send over UART, bridge, not used in MPPT
+            Hi_MOSFET : out std_logic;
+            Lo_MOSFET : out std_logic;
+            SHTDWN : out std_logic;
+            DONE : out std_logic -- Signal to indicate that the MPPT process is done
+        );
+    end component;
+
+    component DataSender is
+        port (
+            CLK : in std_logic;
+            RST : in std_logic;
+            PWR : in std_logic_vector(15 downto 0);
+            DUT : in std_logic_vector(11 downto 0);
+            ERR : in std_logic_vector(15 downto 0);
+            DISP1 : out std_logic_vector(6 downto 0);
+            DISP2 : out std_logic_vector(6 downto 0);
+            DISP3 : out std_logic_vector(6 downto 0);
+            DISP4 : out std_logic_vector(6 downto 0);
+            SEND : in std_logic;
+            TX : out std_logic;
+            BUSY : out std_logic
+        );
+    end component;
+
+    component TimCirc IS
+        GENERIC (
+            ticks : INTEGER := 1529
+        );
+        PORT (
+            clk : IN STD_LOGIC;
+            rst : IN STD_LOGIC;
+            eot : OUT STD_LOGIC
+        );
+    END component;
+
+    component LPF is
+        PORT(
+            RST : in Std_Logic;
+            CLK : in Std_logic;
+            STR : in Std_logic;
+            XIN : in Std_logic_vector(15 downto 0);
+            UOUT : out Std_logic_vector(15 downto 0)
+        );
+    End component; 		  
+    ---------------------------------------------------------------------------------------------------
+    signal DATA_TX : std_logic_vector (15 downto 0); -- Signal to hold data read from INA219
+    signal TX_DONE : std_logic:='0'; -- Signal to indicate UART transmission completion
+    signal DONE_INA : std_logic:='0'; -- Signal to indicate that INA219 reading is done
+    signal DATA_RD, FILT_DATA : std_logic_vector(15 downto 0); -- Signal to hold data read from INA219
+    signal Hi_INT, Lo_INT : std_logic := '0';
+
+    signal DUT : std_logic_vector(11 downto 0):= X"FFF"; -- DUT signal to be sent over UART
+    signal ERR : std_logic_vector(15 downto 0):= X"2694"; -- Error signal to be sent over UART
+    signal PWR : std_logic_vector(15 downto 0):= (others => '0'); -- Power register
+    signal DONE_MPPT : std_logic; -- Signal to indicate that MPPT process is done, not used
+
+    -- Signals for testing purposes
+    signal EOT : std_logic; -- End of transmission signal for TimCirc
+    signal EOT_2 : std_logic; -- End of transmission signal for TimCirc
+    ---------------------------------------------------------------------------------------------------
+begin
+    -- Instantiate Get_INA219
+    INA219 : Get_INA219
+    generic map(
+        SAMPLE_FREQ => 1000
+    )
+    port map (
+        CLK => CLK,
+        RST => RST,
+        SDA => SDA,
+        SCL => SCL,
+        ENA => ENA_INA,
+        DONE => DONE_INA,
+        DATA_RD => DATA_RD
+    );
+
+    -- Instantiate LPF
+    U_FILTER : LPF 
+        PORT MAP(
+            RST => RST,
+            CLK => CLK,
+            STR => DONE_INA,
+            XIN => DATA_RD,
+            UOUT => FILT_DATA
+        );
+
+
+    Timer_MPPT : TimCirc
+    generic map (
+        ticks => 50e6 / 20 -- 20 hz
+    )
+    port map (
+        clk => CLK,
+        rst => ENA_MPPT,
+        eot => EOT_2
+    );
+
+    -- Instantiate MPPT
+    MPPT_Inst : MPPT
+    port map (
+        CLK => CLK,
+        RST => RST,
+        STR => EOT_2, -- Use the DONE signal from INA219 as the STR signal
+        ENA => ENA_MPPT,
+        DATA_INA => DATA_RD,--FILT_DATA, -- Connect to the data read from INA219
+        ERR => ERR,
+        DUT => DUT,
+        PWR => PWR,
+        Hi_MOSFET => Hi_INT,
+        Lo_MOSFET => Lo_INT,
+        SHTDWN => open,--SHTDWN,
+        DONE => DONE_MPPT -- Signal to indicate that MPPT process is done
+    );
+
+    Hi_MOSFET <= Hi_INT;
+    PWM_deb(0) <= Hi_INT;
+    Lo_MOSFET <= Lo_INT;
+    PWM_deb(1) <= Lo_INT;
+    --SHTDWN <= '0';
+    DATA_TX <= DATA_RD when DATA_SEL='1' else FILT_DATA;
+
+    -- Instantiate DataSender
+    DataSender_Inst : DataSender
+    port map (
+        CLK => CLK,
+        RST => RST,
+        PWR => DATA_TX, 
+        DUT => DUT, 
+        ERR => ERR, 
+        DISP1 => DISP1(6 downto 0),
+        DISP2 => DISP2(6 downto 0),
+        DISP3 => DISP3(6 downto 0),
+        DISP4 => DISP4(6 downto 0),
+        SEND => EOT, -- Trigger send signal
+        TX => TX,
+        BUSY => open
+    );
+    DISP1(7) <= '1'; 
+    DISP2(7) <= '1'; 
+    DISP3(7) <= '0'; 
+    DISP4(7) <= '1'; 
+    
+    -- Instantiate TimCirc
+    Timer : TimCirc
+    generic map (
+        ticks => 50e6 / 20 -- 20 hz
+    )
+    port map (
+        clk => CLK,
+        rst => ENA_UART,
+        eot => EOT
+    );
+
+end architecture;

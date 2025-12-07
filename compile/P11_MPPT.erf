@@ -1,0 +1,5 @@
+WARNING DAGGEN_0523: "The source is compiled without the -dbg switch. Line breakpoints and assertion debug will not be available."
+MESSAGE "File: C:/FPGA_Designs/SDLR_II/P11_MPPT/src/MPPT_tb.vhd" 
+MESSAGE "Compile Entity "MPPT_tb"" 
+MESSAGE "Compile Architecture "sim" of Entity "MPPT_tb"" 
+SUCCESS "Compile success 0 Errors 0 Warnings  Analysis time :  78.0 [ms]" 

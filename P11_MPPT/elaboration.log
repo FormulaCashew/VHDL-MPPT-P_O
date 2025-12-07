@@ -1,0 +1,35 @@
+Active-HDL 13.0.375.8320 2025-06-16 23:02:28
+
+Elaboration top modules:
+Architecture                  sim(MPPT_tb)
+
+
+-----------------------------------------------------------------------------------------------------
+Entity            | Architecture | Library  | Info | Compiler Version          | Compilation Options
+-----------------------------------------------------------------------------------------------------
+MPPT_tb           | sim          | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3
+MPPT              | Structural   | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3
+LoadRegister      | Behavioral   | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3 -relax -2008
+PWM_Comp_deadtime | Structural   | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3 -relax -2008
+PWM_ent           | Structural   | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3 -relax -2008
+Dead_time_gen     | Behavioral   | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3 -relax -2008
+TimCirc           | Behavioral   | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3 -relax -2008
+FreeRunCounter    | Behavioral   | p11_mppt |      | 13.0.375.8320 (Windows64) | -O3 -relax -2008
+-----------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------
+VHDL Package                     | Library  | Info | Compiler Version          | Compilation Options
+-----------------------------------------------------------------------------------------------------
+standard                         | std      |      |                           | <unavailable>
+TEXTIO                           | std      |      | 13.0.375.8320 (Windows64) |  -2019
+std_logic_1164                   | ieee     |      | 13.0.375.8320 (Windows64) |  -2008
+NUMERIC_STD                      | ieee     |      | 13.0.375.8320 (Windows64) |  -2008
+-----------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------
+Library                          | Comment
+-----------------------------------------------------------------------------------------------------
+ieee                             | Standard IEEE packages library
+p11_mppt                         | None
+std                              | Standard VHDL library
+-----------------------------------------------------------------------------------------------------

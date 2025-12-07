@@ -1,0 +1,146 @@
+# -------------------------------------------------------------------------- #
+#
+# Copyright (C) 2024  Intel Corporation. All rights reserved.
+# Your use of Intel Corporation's design tools, logic functions 
+# and other software and tools, and any partner logic 
+# functions, and any output files from any of the foregoing 
+# (including device programming or simulation files), and any 
+# associated documentation or information are expressly subject 
+# to the terms and conditions of the Intel Program License 
+# Subscription Agreement, the Intel Quartus Prime License Agreement,
+# the Intel FPGA IP License Agreement, or other applicable license
+# agreement, including, without limitation, that your use is for
+# the sole purpose of programming logic devices manufactured by
+# Intel and sold by Intel or its authorized distributors.  Please
+# refer to the applicable agreement for further details, at
+# https://fpgasoftware.intel.com/eula.
+#
+# -------------------------------------------------------------------------- #
+#
+# Quartus Prime
+# Version 23.1std.1 Build 993 05/14/2024 SC Lite Edition
+# Date created = 17:35:30  June 10, 2025
+#
+# -------------------------------------------------------------------------- #
+#
+# Notes:
+#
+# 1) The default values for assignments are stored in the file:
+#		TopLevel_assignment_defaults.qdf
+#    If this file doesn't exist, see file:
+#		assignment_defaults.qdf
+#
+# 2) Intel recommends that you do not modify this file. This
+#    file is updated automatically by the Quartus Prime software
+#    and any changes you make may be lost or overwritten.
+#
+# -------------------------------------------------------------------------- #
+
+
+set_global_assignment -name FAMILY "MAX 10"
+set_global_assignment -name DEVICE 10M50DAF484C7G
+set_global_assignment -name TOP_LEVEL_ENTITY TopLevel
+set_global_assignment -name ORIGINAL_QUARTUS_VERSION 23.1STD.1
+set_global_assignment -name PROJECT_CREATION_TIME_DATE "17:35:30  JUNE 10, 2025"
+set_global_assignment -name LAST_QUARTUS_VERSION "24.1std.0 Lite Edition"
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
+set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 7
+set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_location_assignment PIN_P11 -to CLK
+set_location_assignment PIN_B8 -to RST
+set_location_assignment PIN_V10 -to SCL
+set_location_assignment PIN_W10 -to SDA
+set_location_assignment PIN_V8 -to TX
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_global_assignment -name EDA_SIMULATION_TOOL "Questa Intel FPGA (VHDL)"
+set_global_assignment -name EDA_TIME_SCALE "1 ps" -section_id eda_simulation
+set_global_assignment -name EDA_OUTPUT_DATA_FORMAT VHDL -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_ENABLE_STATUS TEST_BENCH_MODE -section_id eda_simulation
+set_global_assignment -name EDA_NATIVELINK_SIMULATION_TEST_BENCH TopLevel -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_NAME TopLevel -section_id eda_simulation
+set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id TopLevel
+set_global_assignment -name EDA_TEST_BENCH_RUN_SIM_FOR "200 ms" -section_id TopLevel
+set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME TopLevel -section_id TopLevel
+set_global_assignment -name EDA_TEST_BENCH_FILE src/TopLevel_tb.vhd -section_id TopLevel
+set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_timing
+set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_symbol
+set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_signal_integrity
+set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_boundary_scan
+set_location_assignment PIN_AB3 -to Hi_MOSFET
+set_location_assignment PIN_Y3 -to Lo_MOSFET
+set_location_assignment PIN_Y4 -to SHTDWN
+set_location_assignment PIN_F15 -to ENA_INA
+set_location_assignment PIN_C10 -to ENA_MPPT
+set_location_assignment PIN_B14 -to ENA_UART
+set_location_assignment PIN_AB2 -to PWM_deb[0]
+set_location_assignment PIN_AA2 -to PWM_deb[1]
+set_location_assignment PIN_A14 -to DATA_SEL
+set_global_assignment -name VHDL_FILE src/BCD_2_segments.vhd
+set_global_assignment -name VHDL_FILE src/Togg1.vhd
+set_global_assignment -name VHDL_FILE src/LPF.vhd
+set_global_assignment -name VHDL_FILE src/DecimalCounter.vhd
+set_global_assignment -name VHDL_FILE src/dec_to_ascii.vhd
+set_global_assignment -name VHDL_FILE src/CountUp_slv.vhd
+set_global_assignment -name VHDL_FILE src/CountUp.vhd
+set_global_assignment -name VHDL_FILE src/Bin_to_dec.vhd
+set_global_assignment -name VHDL_FILE src/DataSender.vhd
+set_global_assignment -name VHDL_FILE src/PWM_ent.vhd
+set_global_assignment -name VHDL_FILE src/CoefficientROM.vhd
+set_global_assignment -name VHDL_FILE src/MPPT.vhd
+set_global_assignment -name VHDL_FILE src/Saturation.vhd
+set_global_assignment -name VHDL_FILE src/PID.vhd
+set_global_assignment -name VHDL_FILE src/LoadRegister.vhd
+set_global_assignment -name VHDL_FILE src/i2c_master.vhd
+set_global_assignment -name VHDL_FILE src/Latch_1.vhd
+set_global_assignment -name VHDL_FILE src/UART_TX.vhd
+set_global_assignment -name VHDL_FILE src/TopLevel.vhd
+set_global_assignment -name VHDL_FILE src/TimCirc.vhd
+set_global_assignment -name VHDL_FILE src/Serializer.vhd
+set_global_assignment -name VHDL_FILE src/Rising_edge_gen.vhd
+set_global_assignment -name VHDL_FILE src/PWM_Comp_deadtime.vhd
+set_global_assignment -name VHDL_FILE src/LatchSR.vhd
+set_global_assignment -name VHDL_FILE src/I2C.vhd
+set_global_assignment -name VHDL_FILE src/Get_INA219_tb.vhd
+set_global_assignment -name VHDL_FILE src/Get_INA219.vhd
+set_global_assignment -name VHDL_FILE src/FreeRunCounter.vhd
+set_global_assignment -name VHDL_FILE src/Dead_time_gen.vhd
+set_global_assignment -name VHDL_FILE src/CountDown.vhd
+set_location_assignment PIN_C14 -to DISP1[0]
+set_location_assignment PIN_E15 -to DISP1[1]
+set_location_assignment PIN_C15 -to DISP1[2]
+set_location_assignment PIN_C16 -to DISP1[3]
+set_location_assignment PIN_E16 -to DISP1[4]
+set_location_assignment PIN_D17 -to DISP1[5]
+set_location_assignment PIN_C17 -to DISP1[6]
+set_location_assignment PIN_D15 -to DISP1[7]
+set_location_assignment PIN_C18 -to DISP2[0]
+set_location_assignment PIN_D18 -to DISP2[1]
+set_location_assignment PIN_E18 -to DISP2[2]
+set_location_assignment PIN_B16 -to DISP2[3]
+set_location_assignment PIN_A17 -to DISP2[4]
+set_location_assignment PIN_A18 -to DISP2[5]
+set_location_assignment PIN_B17 -to DISP2[6]
+set_location_assignment PIN_A16 -to DISP2[7]
+set_location_assignment PIN_B20 -to DISP3[0]
+set_location_assignment PIN_A20 -to DISP3[1]
+set_location_assignment PIN_B19 -to DISP3[2]
+set_location_assignment PIN_A21 -to DISP3[3]
+set_location_assignment PIN_B21 -to DISP3[4]
+set_location_assignment PIN_C22 -to DISP3[5]
+set_location_assignment PIN_B22 -to DISP3[6]
+set_location_assignment PIN_A19 -to DISP3[7]
+set_location_assignment PIN_F21 -to DISP4[0]
+set_location_assignment PIN_E22 -to DISP4[1]
+set_location_assignment PIN_E21 -to DISP4[2]
+set_location_assignment PIN_C19 -to DISP4[3]
+set_location_assignment PIN_C20 -to DISP4[4]
+set_location_assignment PIN_D19 -to DISP4[5]
+set_location_assignment PIN_E17 -to DISP4[6]
+set_location_assignment PIN_D22 -to DISP4[7]
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

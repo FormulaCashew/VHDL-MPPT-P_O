@@ -1,0 +1,244 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity MPPT is
+    port (
+        CLK : in std_logic; -- System clock
+        RST : in std_logic; -- General reset signal
+        STR : in std_logic; -- Sampler, given by the INA219 DONE signal
+		  ENA : in std_logic;
+        DATA_INA : in std_logic_vector(15 downto 0); -- Received from GET_INA219
+        ERR : out std_logic_vector(15 downto 0); -- Send Over UART
+        DUT : out std_logic_vector(11 downto 0); -- To send over uart
+        PWR : out std_logic_vector(15 downto 0); -- Power register, to send over UART, bridge, not used in MPPT
+        Hi_MOSFET : out std_logic;
+        Lo_MOSFET : out std_logic;
+        SHTDWN : out std_logic;
+        DONE : out std_logic -- Signal to indicate that the MPPT process is done
+    );
+end MPPT;
+
+architecture Structural of MPPT is
+    -------------------------------------------------------- Component Declarations ---------------------------------------------------
+    component LoadRegister is
+        generic(
+            BusWidth : integer := 16 -- Adjusted to match the data width of INA219
+        );
+        port (
+            RST : in std_logic;
+            CLK : in std_logic;
+            LDR : in std_logic; -- Load signal
+            DIN : in std_logic_vector(BusWidth - 1 downto 0); -- Data input
+            DOUT : out std_logic_vector(BusWidth - 1 downto 0) -- Data output
+        );
+    end component;
+
+    component PID is
+        PORT(
+            RST : in Std_Logic;
+            CLK : in Std_logic;
+            STR : in Std_logic;
+            XIN : in Std_logic_vector(15 downto 0);
+            UOUT : out Std_logic_vector(10 downto 0)
+        );
+    End component; 
+
+    component PWM_Comp_deadtime is
+        generic(
+            bits : integer:=10;
+            deadtime : integer:=100;  --in ns
+            freq : integer:= 50000 --in hz
+        );
+        port (
+            CLK : in std_logic;
+            RST : in std_logic;
+            DUT : in std_logic_vector(bits-1 downto 0);
+            PWM : out std_logic;
+            PWM_comp : out std_logic;
+            DEB : out std_logic -- not used
+        );
+    end component;
+
+    component CountUp is
+        generic(
+            upto : integer:=9
+        );
+        port (
+            CLK : in std_logic;
+            RST : in std_logic;
+            ENI : in std_logic;
+            CNT : out integer range 0 to upto;
+            ENO : out std_logic
+        );
+    end component;
+    ----------------------------------------------------- Signal Declarations ---------------------------------------------------
+    constant MAX_CYCLE : std_logic_vector(11 downto 0):="111111110000"; -- Maximum duty cycle for 12 bits
+    constant PROM : integer := 4;
+    
+    type BUFF_type is array (0 to PROM-1) of std_logic_vector(15 downto 0);
+
+    signal DATA_BUFFER : BUFF_type:=(others => (others => '0'));
+    signal DATA_AVRG : std_logic_vector(15 downto 0);
+    signal sam_count : integer range 0 to prom :=0 ;
+
+    signal DATA_BUFF_0 : std_logic_vector(15 downto 0):=(others => '0');
+    signal DATA_BUFF_1 : std_logic_vector(15 downto 0):=(others => '0');
+    signal DATA_BUFF_2 : std_logic_vector(15 downto 0):=(others => '0');
+    signal DATA_BUFF_3 : std_logic_vector(15 downto 0):=(others => '0');
+
+
+    signal ERR_BUFFER : std_logic_vector(15 downto 0):=(others => '0'); -- Buffer for error data
+    signal DUT_INC : std_logic_vector(11 downto 0):=X"400"; -- Incremental duty cycle output from PID controller
+    signal DUTY_PWM : std_logic_vector(11 downto 0):=(others => '0'); -- Output duty cycle to PWM controller
+    signal STR_PREV : std_logic:='0'; -- Previous state of STR signal for edge detection
+    signal STR_PID : std_logic; -- Signal to trigger PID calculations
+    signal FIRST_RUN : std_logic:='0'; -- Flag to indicate the first run of the process
+    signal STR_PID_PREV : std_logic:='0';
+
+    signal RED_STR : std_logic := '0';
+    signal FED_STR : std_logic := '0';
+    signal RED_PID : std_logic := '0';
+
+    signal P_PREV : std_logic_vector(15 downto 0) := (others => '0');
+    signal DUTY_DIRECTION : std_logic := '1';  -- '1' = increase, '0' = decrease
+	 
+	 signal RST_ENA : std_logic := '0';
+
+
+begin
+    -- Initialize outputs
+    PWR <= DATA_INA; -- Power register, to send over UART, bridge, not used in MPPT
+    SHTDWN <= not RST; -- Shutdown signal, can be used to disable the circuit if needed
+	 RST_ENA <= RST and ENA; 
+
+    LDR_0 : LoadRegister
+        generic map(
+            BusWidth => 16 -- Adjusted to match the data width of INA219
+        )
+        port map (
+            RST => RST,
+            CLK => CLK,
+            LDR => STR, -- Use the DONE signal from INA219 to load data
+            DIN => DATA_INA, -- Connect to the data read from INA219
+            DOUT => DATA_BUFFER(0) -- Output the same data for UART transmission
+        );
+    -- Instantiate LoadRegister
+    LDR_GEN : for i in 1 to PROM-1 generate
+        LDR_i : LoadRegister
+            generic map(
+                BusWidth => 16 -- Adjusted to match the data width of INA219
+            )
+            port map (
+                RST => RST,
+                CLK => CLK,
+                LDR => STR, -- Use the DONE signal from INA219 to load data
+                DIN => DATA_BUFFER(i-1), -- Connect to the data read from INA219
+                DOUT => DATA_BUFFER(i) -- Output the same data for UART transmission
+            );
+    end generate;
+
+    DATA_BUFF_0 <= DATA_BUFFER(0);
+    DATA_BUFF_1 <= DATA_BUFFER(1);
+    DATA_BUFF_2 <= DATA_BUFFER(2);
+    DATA_BUFF_3 <= DATA_BUFFER(3);
+
+    -- Calculate Error
+    ERR_PROC : process(RED_STR,RST)
+        variable SUM : std_logic_vector(18 downto 0):=(others => '0');
+        variable DELTA_P : signed(15 downto 0); -- change in power
+    begin
+        if RST='0' then
+            FIRST_RUN <= '0';
+            STR_PID <= '0';
+            sam_count <= 0;
+            P_PREV <= (others => '0');
+        elsif RED_STR='1' then
+            if sam_count < prom-1 then
+                sam_count <= sam_count + 1;
+                STR_PID <= '0';
+            else
+                sam_count <= 0;
+
+                SUM := (others => '0');
+                for i in 0 to PROM-1 loop
+                    SUM := std_logic_vector(unsigned(DATA_BUFFER(i)) + unsigned(SUM));
+                end loop;
+                DATA_AVRG <= SUM(18 downto 3);
+
+                DELTA_P := signed(DATA_AVRG) - signed(P_PREV);
+                ERR_BUFFER <= std_logic_vector(DELTA_P);
+                ERR <= ERR_BUFFER;
+                P_PREV <= SUM(18 downto 3); -- last prom
+
+                STR_PID <= '1'; 
+
+                if FIRST_RUN = '0' then
+                    FIRST_RUN <= '1';
+                end if;
+            end if;
+        end if;
+    end process;
+
+    RED_PROC : process(CLK, RST)
+    begin
+        if RST='0' then -- Asynchronous reset
+            STR_PREV<='0';
+        elsif CLK'event and CLK='1' then   -- On rising edge of CLK
+            STR_PREV <= STR;
+        end if;
+    end process;
+
+    DUTY_PWM <= DUT_INC when FIRST_RUN='1' else X"400";
+    RED_STR <= '1' when STR_PREV='0' and STR='1' else '0';
+    FED_STR <= '1' when STR_PREV='1' and STR='0' else '0';
+
+    --ERR <= ERR_BUFFER;
+    DONE <= STR_PID; -- Indicate that the MPPT process is done when STR_PID is high, useful
+    DUT <= DUTY_PWM; -- Output the duty cycle to be sent over UART
+
+    CONT_PROC : process(STR_PID,RST_ENA)
+    begin
+        if RST_ENA='0' then
+            DUT_INC <= X"400";  -- Default
+            DUTY_DIRECTION <= '1';  -- Start increasing
+        elsif STR_PID='1' then
+            if (signed(ERR_BUFFER)/= 0) then
+                if ERR_BUFFER(15)='0' then -- Power increased
+                    DUTY_DIRECTION <= '1';    
+                elsif ERR_BUFFER(15)='1' then
+                    DUTY_DIRECTION <= '0';
+                end if;
+                if DUTY_DIRECTION = '1' then
+                    if unsigned(DUT_INC) < 4093 then
+                        DUT_INC <= std_logic_vector(unsigned(DUT_INC) + 1);
+                    else
+                        DUT_INC <= MAX_CYCLE;
+                    end if;
+                    -- Power decreased
+                elsif DUTY_DIRECTION = '0' then   
+                    if unsigned(DUT_INC) > 1 then
+                        DUT_INC <= std_logic_vector(unsigned(DUT_INC) - 1);
+                    else 
+                        DUT_INC <= X"001";
+                    end if;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    U_PWM : PWM_Comp_deadtime
+    generic map(
+        bits => 12, -- Number of bits for duty cycle
+        deadtime => 100, -- Dead time in ns
+        freq => 10_000 -- Frequency in Hz, needs to be: clk_hz/(freq * 2^(bits)) > 1
+    )
+    port map (
+        CLK => CLK,
+        RST => RST_ENA,
+        DUT => DUTY_PWM, -- Use the lower 10 bits for PWM duty cycle
+        PWM => Hi_MOSFET, -- Output PWM signal
+        PWM_comp => Lo_MOSFET, -- Output PWM with dead time compensation
+        DEB => open
+    );
+end architecture;

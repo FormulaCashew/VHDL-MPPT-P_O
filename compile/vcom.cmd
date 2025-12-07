@@ -1,0 +1,1 @@
+-w -erf C:/FPGA_Designs/SDLR_II/P11_MPPT/compile/P11_MPPT.erf -d C:/FPGA_Designs/SDLR_II/P11_MPPT/compile -s C:/FPGA_Designs/SDLR_II/library.cfg -j C:/FPGA_Designs/SDLR_II/P11_MPPT/projlib.cfg -work P11_MPPT -O3 -e 100 -work P11_MPPT -2002 C:/FPGA_Designs/SDLR_II/P11_MPPT/src/MPPT_tb.vhd 

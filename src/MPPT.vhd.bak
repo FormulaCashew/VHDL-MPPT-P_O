@@ -1,0 +1,154 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity MPPT is
+    port (
+        CLK : in std_logic; -- System clock
+        RST : in std_logic; -- General reset signal
+        STR : in std_logic; -- Sampler, given by the INA219 DONE signal
+        DATA_INA : in std_logic_vector(15 downto 0); -- Received from GET_INA219
+        ERR : out std_logic_vector(15 downto 0); -- Send Over UART
+        DUT : out std_logic_vector(11 downto 0); -- To send over uart
+        PWR : out std_logic_vector(15 downto 0); -- Power register, to send over UART, bridge, not used in MPPT
+        Hi_MOSFET : out std_logic;
+        Lo_MOSFET : out std_logic;
+        SHTDWN : out std_logic
+    );
+end MPPT;
+
+architecture Structural of MPPT is
+    -------------------------------------------------------- Component Declarations ---------------------------------------------------
+    component LoadRegister is
+        generic(
+            BusWidth : integer := 16 -- Adjusted to match the data width of INA219
+        );
+        port (
+            RST : in std_logic;
+            CLK : in std_logic;
+            LDR : in std_logic; -- Load signal
+            DIN : in std_logic_vector(BusWidth - 1 downto 0); -- Data input
+            DOUT : out std_logic_vector(BusWidth - 1 downto 0) -- Data output
+        );
+    end component;
+
+    component PID is
+        PORT(
+            RST : in Std_Logic;
+            CLK : in Std_logic;
+            STR : in Std_logic;
+            XIN : in Std_logic_vector(15 downto 0);
+            UOUT : out Std_logic_vector(10 downto 0)
+        );
+    End component; 
+
+    component PWM_Comp_deadtime is
+        generic(
+            bits : integer:=10;
+            deadtime : integer:=100;  --in ns
+            freq : integer:= 50000 --in hz
+        );
+        port (
+            CLK : in std_logic;
+            RST : in std_logic;
+            DUT : in std_logic_vector(bits-1 downto 0);
+            PWM : out std_logic;
+            PWM_comp : out std_logic;
+            DEB : out std_logic -- not used
+        );
+    end component;
+    ----------------------------------------------------- Signal Declarations ---------------------------------------------------
+    constant MAX_CYCLE : std_logic_vector(11 downto 0):="011111111110"; -- Maximum duty cycle for 12 bits
+
+    signal DATA_BUFFER : std_logic_vector(15 downto 0):=(others => '0'); -- Buffer for data read from INA219
+    signal DATA_BUFFER_LAST : std_logic_vector(15 downto 0):=(others => '0'); -- Buffer 2
+    signal ERR_BUFFER : std_logic_vector(15 downto 0):=(others => '0'); -- Buffer for error data
+    signal DUT_INC : std_logic_vector(10 downto 0):=(others => '0'); -- Incremental duty cycle output from PID controller
+    signal DUTY_PWM : std_logic_vector(11 downto 0); -- Output duty cycle to PWM controller
+    signal STR_PREV : std_logic:='0'; -- Previous state of STR signal for edge detection
+    signal STR_PID : std_logic; -- Signal to trigger PID calculations
+begin
+    -- Initialize outputs
+    PWR <= DATA_INA; -- Power register, to send over UART, bridge, not used in MPPT
+    SHTDWN <= '1'; -- Shutdown signal, can be used to disable the circuit if needed
+
+    -- Instantiate LoadRegister
+    LDR_1 : LoadRegister
+    generic map(
+        BusWidth => 16 -- Adjusted to match the data width of INA219
+    )
+    port map (
+        RST => RST,
+        CLK => CLK,
+        LDR => STR, -- Use the DONE signal from INA219 to load data
+        DIN => DATA_INA, -- Connect to the data read from INA219
+        DOUT => DATA_BUFFER -- Output the same data for UART transmission
+    );
+
+    LDR_2 : LoadRegister
+    generic map(
+        BusWidth => 16 -- Adjusted to match the data width of INA219
+    )
+    port map (
+        RST => RST,
+        CLK => CLK,
+        LDR => STR, -- Use the DONE signal from INA219 to load data
+        DIN => DATA_BUFFER, -- Connect to the data read from INA219
+        DOUT => DATA_BUFFER_LAST -- Output the same data for UART transmission
+    );
+
+    -- Calculate Error
+    ERR_PROC : process(CLK, RST)
+    begin
+        if RST='90 then -- Asynchronous reset
+            ERR_BUFFER <= (others => '0');
+            DUT_INC <= (others => '0');
+            ERR <= (others => '0');
+        else
+            if CLK'event and CLK='1' then   -- On rising edge of CLK
+                STR_PREV <= STR; -- Store the previous state of STR
+                if STR='0' and STR_PREV='1' then -- Detect Falling edge of STR
+                    ERR <= DATA_BUFFER - DATA_BUFFER_LAST; -- Connect error buffer to output
+                    ERR_BUFFER <= DATA_BUFFER - DATA_BUFFER_LAST; -- Calculate error, will be updaed on time for PID calculations
+                    STR_PID <= '1'; -- Trigger PID calculations
+                elsif STR='1' and STR_PREV='0' then -- Detect Rising edge of STR
+                    STR_PID <= '0'; -- Reset the PID trigger signal
+                    DUTY_PWM <= DUTY_PWM + DUT_INC; -- Update the duty cycle output
+                    if DUTY_PWM > MAX_CYCLE then -- Limit the duty cycle to 11 bits
+                        DUTY_PWM <= MAX_CYCLE; -- Maximum duty cycle
+                    end if;
+                else
+                    STR_PID <= '0'; -- Reset the PID trigger signal
+                end if;                
+            end if;
+        end if;
+    end process;
+
+    DUT <= DUTY_PWM; -- Output the duty cycle to be sent over UART
+
+    U_PID : PID
+    port map (
+        RST => RST,
+        CLK => CLK,
+        STR => STR_PID, -- Use the same signal to trigger PID calculations
+        XIN => ERR_BUFFER, -- Input data for PID calculations
+        UOUT => DUT_INC -- Output control signal
+    );
+
+    U_PWM : PWM_Comp_deadtime
+    generic map(
+        bits => 12, -- Number of bits for duty cycle
+        deadtime => 100, -- Dead time in ns
+        freq => 25_000 -- Frequency in Hz
+    )
+    port map (
+        CLK => CLK,
+        RST => RST,
+        DUT => DUTY_PWM, -- Use the lower 10 bits for PWM duty cycle
+        PWM => Hi_MOSFET, -- Output PWM signal
+        PWM_comp => Lo_MOSFET, -- Output PWM with dead time compensation
+        DEB => open
+    );
+
+
+end architecture;

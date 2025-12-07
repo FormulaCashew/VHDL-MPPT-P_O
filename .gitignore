@@ -1,0 +1,5 @@
+simulation/
+log/
+src/*.vcd
+db/
+incremental_db/
